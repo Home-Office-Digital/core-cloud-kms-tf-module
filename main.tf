@@ -119,7 +119,7 @@ resource "aws_kms_key" "this" {
     # known here (via the data source), hence a precondition rather than a var
     # validation.
     precondition {
-      condition     = alltrue([for arn in var.key_administrators : split(":", arn)[4] == local.account_id])
+      condition     = var.policy_override != null && var.policy_override != "" ? true : alltrue([for arn in var.key_administrators : split(":", arn)[4] == local.account_id])
       error_message = "key_administrators must be in the key's own account (${local.account_id}); KMS does not support cross-account key administration. External administrators must assume a role in the owning account, or use policy_override."
     }
   }
