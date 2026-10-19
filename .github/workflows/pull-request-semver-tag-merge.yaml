@@ -1,0 +1,51 @@
+name: 'SemVer Tag on Main Merge'
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+permissions:
+  pull-requests: read
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  semver-tag:
+    name: 'Tag Repository with SemVer'
+    if: |
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'skip-release') == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse the SemVer label
+        id: label
+        uses: UKHomeOffice/match-label-action@v1
+        with:
+          labels: minor,major,patch
+          mode: singular
+
+      - name: Calculate SemVer value
+        id: calculate
+        uses: UKHomeOffice/semver-calculate-action@v2
+        with:
+          increment: ${{ steps.label.outputs.matchedLabels }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Baseline from the highest existing release tag so the tag produced on
+          # merge is always above the latest release, even when the base SHA is
+          # untagged (e.g. after a skip-release merge). Without this the action
+          # falls back to 0.0.0 and can try to publish a duplicate or lower tag.
+          default_to_highest: true
+
+      - name: Tag Repository
+        uses: UKHomeOffice/semver-tag-action@v4
+        with:
+          tag: ${{ steps.calculate.outputs.version }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
